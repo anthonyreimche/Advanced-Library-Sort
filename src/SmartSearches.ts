@@ -8,14 +8,8 @@ import { h, R, api } from "./runtime";
 import { searchStore } from "./search-store";
 import { isQueryActive } from "./query";
 import { searchIcon } from "./icons";
+import { withSavedSearch, withoutSavedSearch, type SavedSearch } from "./saved-searches";
 import type { LibraryFilter } from "./safelight";
-
-interface SavedSearch {
-  id: string;
-  name: string;
-  query: string;
-  filter: LibraryFilter;
-}
 
 const KEY = "savedSearches";
 
@@ -81,14 +75,7 @@ export function SmartSearchesPanel() {
       liveQuery.trim() ||
       filterSummary(liveFilter) ||
       "Untitled search";
-    const entry: SavedSearch = {
-      // Deterministic-ish unique id without Date/Math.random reliance issues.
-      id: `s_${label.replace(/\W+/g, "-")}_${list.length}`,
-      name: label,
-      query: liveQuery,
-      filter: liveFilter,
-    };
-    commit([...list, entry]);
+    commit(withSavedSearch(list, { name: label, query: liveQuery, filter: liveFilter }));
     setName("");
   };
 
@@ -99,7 +86,7 @@ export function SmartSearchesPanel() {
   };
 
   const onDelete = (id: string) => {
-    commit(list.filter((s: SavedSearch) => s.id !== id));
+    commit(withoutSavedSearch(list, id));
   };
 
   // Name field stays a bare <input> (not api.ui TextInput) so it keeps
@@ -133,11 +120,9 @@ export function SmartSearchesPanel() {
         type: "text",
         value: name,
         placeholder: "Name this search…",
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        onChange: (e: any) => setName(e.target.value),
+        onChange: (e: { currentTarget: HTMLInputElement }) => setName(e.currentTarget.value),
         // Enter saves (when there's something to save).
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        onKeyDown: (e: any) => {
+        onKeyDown: (e: { key: string }) => {
           if (e.key === "Enter" && canSave) onSave();
         },
         style: textInput,
@@ -192,12 +177,10 @@ export function SmartSearchesPanel() {
                   borderRadius: "4px",
                   padding: "4px",
                 },
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                onMouseEnter: (e: any) => {
+                onMouseEnter: (e: { currentTarget: HTMLElement }) => {
                   e.currentTarget.style.background = t.surface2;
                 },
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                onMouseLeave: (e: any) => {
+                onMouseLeave: (e: { currentTarget: HTMLElement }) => {
                   e.currentTarget.style.background = "transparent";
                 },
               },
@@ -267,12 +250,10 @@ export function SmartSearchesPanel() {
                     fontSize: "13px",
                     lineHeight: 1,
                   },
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  onMouseEnter: (e: any) => {
+                  onMouseEnter: (e: { currentTarget: HTMLElement }) => {
                     e.currentTarget.style.color = "#e06666";
                   },
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  onMouseLeave: (e: any) => {
+                  onMouseLeave: (e: { currentTarget: HTMLElement }) => {
                     e.currentTarget.style.color = t.textMuted;
                   },
                 },

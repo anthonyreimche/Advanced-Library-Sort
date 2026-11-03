@@ -41,7 +41,7 @@ combined, so each one narrows the results further.
 ## Save your go-to searches
 
 The **Smart Searches** panel (docked on the left of the Library) keeps your
-favorite query and filter combos one click away — *Keepers from this trip*,
+favourite query and filter combos one click away — *Keepers from this trip*,
 *Telephoto wildlife*, *Anything over ISO 6400* — whatever you reach for often.
 
 ## Privacy

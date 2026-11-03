@@ -82,22 +82,18 @@ export function SearchBar() {
       placeholder: "Search in library…",
       title:
         "Search filename, keywords, camera, lens, ISO, date. Try: heron 300mm · lens:70-300 · iso:>3200 · date:2024-06",
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      onChange: (e: any) => setQuery(e.target.value),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      onKeyDown: (e: any) => {
+      onChange: (e: { currentTarget: HTMLInputElement }) => setQuery(e.currentTarget.value),
+      onKeyDown: (e: { key: string }) => {
         // Esc clears the text, or closes the bar when it's already empty.
         if (e.key === "Escape") {
           if (query) setQuery("");
           else close();
         }
       },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      onFocus: (e: any) => {
+      onFocus: (e: { currentTarget: HTMLInputElement }) => {
         e.currentTarget.style.borderColor = t.accent;
       },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      onBlur: (e: any) => {
+      onBlur: (e: { currentTarget: HTMLInputElement }) => {
         e.currentTarget.style.borderColor = t.borderSubtle;
       },
       style: {
