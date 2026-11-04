@@ -46,7 +46,7 @@ favourite query and filter combos one click away — *Keepers from this trip*,
 
 ## Privacy
 
-Everything runs locally over the photos already in your catalog. No indexing
+Everything runs locally over the photos already in your catalogue. No indexing
 service, no network requests, no data leaves your machine.
 
 ---

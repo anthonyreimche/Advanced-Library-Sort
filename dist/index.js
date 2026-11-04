@@ -281,7 +281,7 @@ function SearchBar() {
 		value: query,
 		placeholder: "Search in library…",
 		title: "Search filename, keywords, camera, lens, ISO, date. Try: heron 300mm · lens:70-300 · iso:>3200 · date:2024-06",
-		onChange: (e) => setQuery(e.target.value),
+		onChange: (e) => setQuery(e.currentTarget.value),
 		onKeyDown: (e) => {
 			if (e.key === "Escape") if (query) setQuery("");
 			else close();
@@ -341,6 +341,26 @@ function SearchBar() {
 	} }, field, closeButton);
 }
 //#endregion
+//#region src/saved-searches.ts
+/** An id no entry in `list` uses. The fallback is for a runtime without
+*  crypto.randomUUID (an insecure context). */
+function newSearchId(list) {
+	if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
+	const used = new Set(list.map((s) => s.id));
+	let n = list.length;
+	while (used.has(`s_${n}`)) n += 1;
+	return `s_${n}`;
+}
+function withSavedSearch(list, fields) {
+	return [...list, {
+		id: newSearchId(list),
+		...fields
+	}];
+}
+function withoutSavedSearch(list, id) {
+	return list.filter((s) => s.id !== id);
+}
+//#endregion
 //#region src/SmartSearches.ts
 const KEY = "savedSearches";
 function load() {
@@ -390,14 +410,11 @@ function SmartSearchesPanel() {
 		save(next);
 	};
 	const onSave = () => {
-		const label = name.trim() || liveQuery.trim() || filterSummary(liveFilter) || "Untitled search";
-		const entry = {
-			id: `s_${label.replace(/\W+/g, "-")}_${list.length}`,
-			name: label,
+		commit(withSavedSearch(list, {
+			name: name.trim() || liveQuery.trim() || filterSummary(liveFilter) || "Untitled search",
 			query: liveQuery,
 			filter: liveFilter
-		};
-		commit([...list, entry]);
+		}));
 		setName("");
 	};
 	const onApply = (s) => {
@@ -405,7 +422,7 @@ function SmartSearchesPanel() {
 		api().stores.useUIStore.getState().setFilter(s.filter);
 	};
 	const onDelete = (id) => {
-		commit(list.filter((s) => s.id !== id));
+		commit(withoutSavedSearch(list, id));
 	};
 	const textInput = {
 		minWidth: 0,
@@ -437,7 +454,7 @@ function SmartSearchesPanel() {
 		type: "text",
 		value: name,
 		placeholder: "Name this search…",
-		onChange: (e) => setName(e.target.value),
+		onChange: (e) => setName(e.currentTarget.value),
 		onKeyDown: (e) => {
 			if (e.key === "Enter" && canSave) onSave();
 		},
