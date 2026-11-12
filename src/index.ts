@@ -10,7 +10,7 @@
 import type { SafelightAPI } from "./safelight";
 import { initRuntime } from "./runtime";
 import { initSearchStore } from "./search-store";
-import { buildMatcher } from "./query";
+import { buildMatcher, isQueryActive } from "./query";
 import { SORTS } from "./sort";
 import { SearchBar } from "./SearchBar";
 import { SmartSearchesPanel } from "./SmartSearches";
@@ -31,10 +31,12 @@ export function activate(api: SafelightAPI): void {
   // Rebuild the grid predicate from the current query and (re)register it.
   // Re-registering the same id replaces the entry, so the grid re-derives.
   const applyFilter = () => {
-    const matcher = buildMatcher(store.getState().query);
+    const { query } = store.getState();
     api.registerGridFilter({
       id: GRID_FILTER_ID,
-      test: matcher,
+      test: buildMatcher(query),
+      // An empty box reads no photo field; a query may read any of them.
+      reads: isQueryActive(query) ? undefined : [],
       // "Clear filters" (core) empties the search box too.
       onClear: () => store.getState().setQuery(""),
     });

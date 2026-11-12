@@ -96,5 +96,13 @@ check(
   ["Camera", "Lens", "Focal Length", "ISO"],
 );
 
+// Each sort compares EXIF values only, and says so: the Library then sorts
+// again for an EXIF change, not for every rating or flag.
+check(
+  "every sort declares it reads exif",
+  SORTS.map((s) => s.reads.join()),
+  ["exif", "exif", "exif", "exif"],
+);
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

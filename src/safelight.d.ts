@@ -74,6 +74,9 @@ export interface UIStoreState {
 export interface GridFilterContribution {
   id: string;
   test(photo: CatalogPhoto): boolean;
+  /** The photo fields `test` reads, by top-level name; the Library filters
+   *  again only when one changes. `[]` for a test that reads none. */
+  reads?: readonly (keyof CatalogPhoto)[];
   onClear?(): void;
 }
 
@@ -115,6 +118,9 @@ export interface LibrarySortContribution {
   id: string;
   label: string;
   compare(a: CatalogPhoto, b: CatalogPhoto): number;
+  /** The photo fields `compare` reads, by top-level name; the Library sorts
+   *  again only when one changes. */
+  reads?: readonly (keyof CatalogPhoto)[];
 }
 
 export type SettingsField =

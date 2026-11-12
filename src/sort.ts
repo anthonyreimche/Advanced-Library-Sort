@@ -11,6 +11,9 @@ export interface SortDef {
   id: string;
   label: string;
   compare: Compare;
+  /** The photo fields the comparator reads: the Library sorts again only when
+   *  one of them changes. */
+  reads: readonly (keyof CatalogPhoto)[];
 }
 
 const PREFIX = "com.safelight.advanced-library-sort";
@@ -45,8 +48,13 @@ function cameraName(p: CatalogPhoto): string {
 }
 
 export const SORTS: SortDef[] = [
-  { id: `${PREFIX}.camera`, label: "Camera", compare: text(cameraName) },
-  { id: `${PREFIX}.lens`, label: "Lens", compare: text((p) => p.exif.lens) },
-  { id: `${PREFIX}.focal`, label: "Focal Length", compare: num((p) => p.exif.focalLength) },
-  { id: `${PREFIX}.iso`, label: "ISO", compare: num((p) => p.exif.iso) },
+  { id: `${PREFIX}.camera`, label: "Camera", compare: text(cameraName), reads: ["exif"] },
+  { id: `${PREFIX}.lens`, label: "Lens", compare: text((p) => p.exif.lens), reads: ["exif"] },
+  {
+    id: `${PREFIX}.focal`,
+    label: "Focal Length",
+    compare: num((p) => p.exif.focalLength),
+    reads: ["exif"],
+  },
+  { id: `${PREFIX}.iso`, label: "ISO", compare: num((p) => p.exif.iso), reads: ["exif"] },
 ];
