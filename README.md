@@ -31,9 +31,17 @@ combined, so each one narrows the results further.
 | `lens:70-300 iso:>3200` | a 70-300 lens, ISO above 3200 |
 | `camera:D5300 date:2025-08` | that camera, in August 2025 |
 | `filename:DSC_04` | filenames containing *DSC_04* |
+| `edited:no label:red` | red-labelled shots you haven't edited yet |
+| `edited:2026-11` | shots you last edited in November 2026 |
 
 **Fields:** `filename`, `keyword`, `camera`, `lens`, `type`, `label`, `iso`,
-`focal`, `date`.
+`focal`, `date`, `edited`.
+
+**Edits** (`edited`, Safelight 3.2.6 and later): `edited:yes` finds the shots
+you've edited, `edited:no` the ones you haven't (undoing every step counts as
+unedited). Any other value matches the day you last edited it, like `date:`
+does for the capture date. To sort by when you last edited, use **Edited** in
+the Library's own sort menu.
 
 **Numbers** (`iso`, `focal`) accept ranges and comparisons:
 `iso:6400`, `iso:>3200`, `focal:<=50`, `focal:200-300`.

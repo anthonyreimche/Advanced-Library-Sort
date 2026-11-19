@@ -40,12 +40,15 @@ export type FlagFilter = "any" | "pick" | "reject";
 export type LabelFilter = "any" | ColorLabel;
 export type RatingOp = "lt" | "lte" | "gt" | "gte" | "eq" | "neq";
 
+export type EditedFilter = "any" | "edited" | "unedited";
+
 export interface LibraryFilter {
   rating: number;
   ratingOp: RatingOp;
   flag: FlagFilter;
   label: LabelFilter;
   keywords: string[];
+  edited: EditedFilter;
 }
 
 // ── Zustand-ish store handles ────────────────────────────────────────────────
@@ -77,6 +80,9 @@ export interface GridFilterContribution {
   /** The photo fields `test` reads, by top-level name; the Library filters
    *  again only when one changes. `[]` for a test that reads none. */
   reads?: readonly (keyof CatalogPhoto)[];
+  /** Set when `test` calls catalog.editedAt: the Library filters again each
+   *  time an edit is stored. */
+  readsEdits?: boolean;
   onClear?(): void;
 }
 
@@ -152,6 +158,11 @@ export interface SafelightAPI {
   registerKeybinding(c: KeyActionContribution): void;
   registerPanel(c: PanelContribution): void;
   registerSettings(c: SettingsContribution): void;
+  catalog: {
+    /** When a photo's edit last changed (ms), or undefined for one never
+     *  edited or with every step undone. */
+    editedAt(id: string): number | undefined;
+  };
   settings: {
     get<T>(key: string, fallback: T): T;
     set(key: string, value: unknown): void;

@@ -10,7 +10,7 @@
 import type { SafelightAPI } from "./safelight";
 import { initRuntime } from "./runtime";
 import { initSearchStore } from "./search-store";
-import { buildMatcher, isQueryActive } from "./query";
+import { buildMatcher, isQueryActive, queryReadsEdits } from "./query";
 import { SORTS } from "./sort";
 import { SearchBar } from "./SearchBar";
 import { SmartSearchesPanel } from "./SmartSearches";
@@ -34,9 +34,11 @@ export function activate(api: SafelightAPI): void {
     const { query } = store.getState();
     api.registerGridFilter({
       id: GRID_FILTER_ID,
-      test: buildMatcher(query),
+      test: buildMatcher(query, api.catalog.editedAt),
       // An empty box reads no photo field; a query may read any of them.
       reads: isQueryActive(query) ? undefined : [],
+      // An edited: term reads edit times, which are no photo field.
+      readsEdits: queryReadsEdits(query),
       // "Clear filters" (core) empties the search box too.
       onClear: () => store.getState().setQuery(""),
     });

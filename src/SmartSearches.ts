@@ -8,7 +8,13 @@ import { h, R, api } from "./runtime";
 import { searchStore } from "./search-store";
 import { isQueryActive } from "./query";
 import { searchIcon } from "./icons";
-import { withSavedSearch, withoutSavedSearch, type SavedSearch } from "./saved-searches";
+import {
+  filterSummary,
+  restoredFilter,
+  withSavedSearch,
+  withoutSavedSearch,
+  type SavedSearch,
+} from "./saved-searches";
 import type { LibraryFilter } from "./safelight";
 
 const KEY = "savedSearches";
@@ -20,24 +26,6 @@ function load(): SavedSearch[] {
 
 function save(list: SavedSearch[]): void {
   api().settings.set(KEY, list);
-}
-
-// Short human summary of a saved filter, e.g. "≥3★ · red".
-function filterSummary(f: LibraryFilter): string {
-  const parts: string[] = [];
-  const opSym: Record<string, string> = {
-    lt: "<",
-    lte: "≤",
-    gt: ">",
-    gte: "≥",
-    eq: "=",
-    neq: "≠",
-  };
-  if (f.rating > 0 || f.ratingOp !== "gte") parts.push(`${opSym[f.ratingOp] ?? "≥"}${f.rating}★`);
-  if (f.flag !== "any") parts.push(f.flag);
-  if (f.label !== "any") parts.push(f.label);
-  if (f.keywords.length) parts.push(f.keywords.join(", "));
-  return parts.join(" · ");
 }
 
 export function SmartSearchesPanel() {
@@ -82,7 +70,7 @@ export function SmartSearchesPanel() {
   const onApply = (s: SavedSearch) => {
     searchStore().getState().setQuery(s.query);
     // setFilter merges a full LibraryFilter, so this fully restores the combo.
-    api().stores.useUIStore.getState().setFilter(s.filter);
+    api().stores.useUIStore.getState().setFilter(restoredFilter(s));
   };
 
   const onDelete = (id: string) => {

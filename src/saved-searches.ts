@@ -1,13 +1,41 @@
 // Saved-search list edits for the Smart Searches panel, kept free of React and
 // the runtime so they can be tested directly.
 
-import type { LibraryFilter } from "./safelight";
+import type { EditedFilter, LibraryFilter } from "./safelight";
 
 export interface SavedSearch {
   id: string;
   name: string;
   query: string;
-  filter: LibraryFilter;
+  /** Searches saved before Safelight 3.2.6 have no `edited`. */
+  filter: Omit<LibraryFilter, "edited"> & { edited?: EditedFilter };
+}
+
+const RATING_OP_SYMBOL: Record<string, string> = {
+  lt: "<",
+  lte: "≤",
+  gt: ">",
+  gte: "≥",
+  eq: "=",
+  neq: "≠",
+};
+
+/** Short human summary of a filter, e.g. "≥3★ · red · edited"; "" while it
+ *  narrows nothing. */
+export function filterSummary(f: SavedSearch["filter"]): string {
+  const parts: string[] = [];
+  if (f.rating > 0 || f.ratingOp !== "gte") parts.push(`${RATING_OP_SYMBOL[f.ratingOp] ?? "≥"}${f.rating}★`);
+  if (f.flag !== "any") parts.push(f.flag);
+  if (f.label !== "any") parts.push(f.label);
+  if (f.keywords.length) parts.push(f.keywords.join(", "));
+  if (f.edited && f.edited !== "any") parts.push(f.edited);
+  return parts.join(" · ");
+}
+
+/** The whole Library filter a saved search puts back: one saved before the
+ *  Edits filter existed sets Edits to All. */
+export function restoredFilter(s: SavedSearch): LibraryFilter {
+  return { ...s.filter, edited: s.filter.edited ?? "any" };
 }
 
 /** An id no entry in `list` uses. The fallback is for a runtime without

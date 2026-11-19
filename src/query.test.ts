@@ -1,7 +1,7 @@
 // Tests for the search query parser.
 // Run with: node --experimental-strip-types src/query.test.ts
 
-import { buildMatcher, isQueryActive } from "./query.ts";
+import { buildMatcher, isQueryActive, queryReadsEdits } from "./query.ts";
 import type { CatalogPhoto, ExifData } from "./safelight";
 
 // Build a CatalogPhoto with sensible defaults; override what a case cares about.
@@ -30,8 +30,12 @@ function photo(over: {
 let passed = 0;
 let failed = 0;
 
+// Edit times by photo id, as api.catalog.editedAt gives them.
+const editTimes = new Map<string, number>();
+const editedAt = (id: string) => editTimes.get(id);
+
 function check(name: string, query: string, p: CatalogPhoto, expected: boolean) {
-  const got = buildMatcher(query)(p);
+  const got = buildMatcher(query, editedAt)(p);
   if (got === expected) {
     passed++;
     console.log(`  ✓ ${name}`);
@@ -91,6 +95,46 @@ check("two-token AND", "heron 300mm", heron, true);
 check("two-token AND miss", "owl 300mm", owl, false);
 check("unknown field falls back to text", "foo:heron", heron, true);
 check("empty matches all", "   ", owl, true);
+
+// Edits — the heron was edited on 2026-11-03 (local time), the owl never
+editTimes.set(heron.id, new Date(2026, 10, 3, 14, 0, 0).getTime());
+check("edited:yes", "edited:yes", heron, true);
+check("edited:yes miss", "edited:yes", owl, false);
+check("edited:no", "edited:no", owl, true);
+check("edited:no miss", "edited:no", heron, false);
+check("edited:true / false", "edited:true", heron, true);
+check("edited:n", "edited:n", heron, false);
+check("edit alias", "edit:y", heron, true);
+check("edited:month", "edited:2026-11", heron, true);
+check("edited:month miss", "edited:2026-10", heron, false);
+check("edited date never matches an unedited photo", "edited:2026", owl, false);
+check("edited combines with other terms", "edited:yes bird iso:>3200", heron, true);
+check("bare text ignores edit dates", "2026-11", heron, false);
+{
+  const got = buildMatcher("edited:yes")(heron);
+  if (got === false) {
+    passed++;
+    console.log("  ✓ edited:yes matches nothing without an edit lookup");
+  } else {
+    failed++;
+    console.log("  ✗ edited:yes without an edit lookup should match nothing");
+  }
+}
+for (const [query, expected] of [
+  ["edited:yes", true],
+  ["heron edit:2026", true],
+  ["heron iso:>3200", false],
+  ["edited:", false],
+  ["", false],
+] as const) {
+  if (queryReadsEdits(query) === expected) {
+    passed++;
+    console.log(`  ✓ queryReadsEdits("${query}") is ${expected}`);
+  } else {
+    failed++;
+    console.log(`  ✗ queryReadsEdits("${query}") should be ${expected}`);
+  }
+}
 
 // isQueryActive
 if (isQueryActive("") || isQueryActive("   ")) {
