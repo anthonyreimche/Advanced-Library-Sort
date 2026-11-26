@@ -21,13 +21,24 @@ function h(type, props, ...children) {
 }
 //#endregion
 //#region src/search-store.ts
+/** The bar after a toggle: opening keeps the box, closing empties it. */
+function toggled(s) {
+	return s.visible ? {
+		visible: false,
+		query: ""
+	} : {
+		visible: true,
+		query: s.query
+	};
+}
 let store = null;
 function initSearchStore(api) {
 	store = api.stores.create((set) => ({
 		query: "",
 		setQuery: (q) => set({ query: q }),
 		visible: false,
-		setVisible: (v) => set({ visible: v })
+		setVisible: (v) => set({ visible: v }),
+		toggle: () => set(toggled)
 	}));
 	return store;
 }
@@ -37,12 +48,32 @@ function searchStore() {
 }
 //#endregion
 //#region src/query.ts
-/** Build a matcher from a raw query. Empty/whitespace matches everything. */
-function buildMatcher(raw) {
+const EDIT_FIELDS = /* @__PURE__ */ new Set(["edited", "edit"]);
+const YES = /* @__PURE__ */ new Set([
+	"yes",
+	"y",
+	"true"
+]);
+const NO = /* @__PURE__ */ new Set([
+	"no",
+	"n",
+	"false"
+]);
+/** Build a matcher from a raw query. Empty/whitespace matches everything.
+*  Without `editedAt` (a Safelight older than 3.2.6), an edited: term matches
+*  nothing. */
+function buildMatcher(raw, editedAt) {
 	const tokens = tokenize(raw);
 	if (tokens.length === 0) return () => true;
-	const clauses = tokens.map(compileToken);
+	const clauses = tokens.map((token) => compileToken(token, editedAt));
 	return (photo) => clauses.every((c) => c(photo));
+}
+/** Whether a query has an edited: term, so its matcher reads edit times. */
+function queryReadsEdits(raw) {
+	return tokenize(raw).some((token) => {
+		const colon = token.indexOf(":");
+		return colon > 0 && colon < token.length - 1 && EDIT_FIELDS.has(token.slice(0, colon).toLowerCase());
+	});
 }
 /** True when a query actually constrains anything (drives the active styling). */
 function isQueryActive(raw) {
@@ -51,12 +82,13 @@ function isQueryActive(raw) {
 function tokenize(raw) {
 	return raw.trim().split(/\s+/).filter(Boolean);
 }
-function compileToken(token) {
+function compileToken(token, editedAt) {
 	const colon = token.indexOf(":");
 	if (colon > 0) {
 		const field = token.slice(0, colon).toLowerCase();
 		const value = token.slice(colon + 1);
 		if (value) {
+			if (EDIT_FIELDS.has(field)) return editClause(value, editedAt);
 			const clause = compileField(field, value);
 			if (clause) return clause;
 			return freeText(value);
@@ -89,6 +121,16 @@ function compileField(field, value) {
 		case "day": return (p) => dateStr(p).includes(value.toLowerCase());
 		default: return null;
 	}
+}
+function editClause(value, editedAt) {
+	if (!editedAt) return () => false;
+	const v = value.toLowerCase();
+	if (YES.has(v)) return (p) => editedAt(p.id) !== void 0;
+	if (NO.has(v)) return (p) => editedAt(p.id) === void 0;
+	return (p) => {
+		const t = editedAt(p.id);
+		return t !== void 0 && localDate(t).includes(v);
+	};
 }
 function incl(hay, needle) {
 	return !!hay && hay.toLowerCase().includes(needle.toLowerCase());
@@ -143,8 +185,10 @@ function parseNum(value) {
 }
 /** Local YYYY-MM-DD for the capture date, or "" if unknown. */
 function dateStr(p) {
-	const t = p.dateCreated;
-	if (!t) return "";
+	return p.dateCreated ? localDate(p.dateCreated) : "";
+}
+/** Local YYYY-MM-DD for a time in ms, or "" for an invalid one. */
+function localDate(t) {
 	const d = new Date(t);
 	if (Number.isNaN(d.getTime())) return "";
 	const mm = String(d.getMonth() + 1).padStart(2, "0");
@@ -183,22 +227,26 @@ const SORTS = [
 	{
 		id: `${PREFIX}.camera`,
 		label: "Camera",
-		compare: text(cameraName)
+		compare: text(cameraName),
+		reads: ["exif"]
 	},
 	{
 		id: `${PREFIX}.lens`,
 		label: "Lens",
-		compare: text((p) => p.exif.lens)
+		compare: text((p) => p.exif.lens),
+		reads: ["exif"]
 	},
 	{
 		id: `${PREFIX}.focal`,
 		label: "Focal Length",
-		compare: num((p) => p.exif.focalLength)
+		compare: num((p) => p.exif.focalLength),
+		reads: ["exif"]
 	},
 	{
 		id: `${PREFIX}.iso`,
 		label: "ISO",
-		compare: num((p) => p.exif.iso)
+		compare: num((p) => p.exif.iso),
+		reads: ["exif"]
 	}
 ];
 //#endregion
@@ -229,6 +277,14 @@ function searchIcon(size = 14) {
 		x2: 16.65,
 		y2: 16.65
 	}));
+}
+//#endregion
+//#region src/shortcut.ts
+const ID = "com.safelight.advanced-library-sort";
+const TOGGLE_SEARCH_ACTION = `${ID}.focus`;
+/** "Label (Combo)", or the label alone when the action is unbound. */
+function withShortcut(label, combo) {
+	return combo ? `${label} (${combo})` : label;
 }
 //#endregion
 //#region src/SearchBar.ts
@@ -327,7 +383,7 @@ function SearchBar() {
 		variant: "ghost",
 		size: "sm",
 		onClick: close,
-		title: "Close search (Ctrl+F)",
+		title: withShortcut("Close search", api().keybindings.getBinding(TOGGLE_SEARCH_ACTION)),
 		"aria-label": "Close search"
 	}, "×");
 	return h("div", { style: {
@@ -341,7 +397,56 @@ function SearchBar() {
 	} }, field, closeButton);
 }
 //#endregion
+//#region src/SearchToggle.ts
+function SearchToggle() {
+	const ui = api().ui;
+	if (!ui) return null;
+	const store = searchStore();
+	const visible = store((s) => s.visible);
+	const toggle = store((s) => s.toggle);
+	const combo = api().keybindings.getBinding(TOGGLE_SEARCH_ACTION);
+	return h("button", {
+		type: "button",
+		onClick: toggle,
+		title: withShortcut(visible ? "Close the library search" : "Search the library", combo),
+		"aria-label": "Toggle library search",
+		"aria-pressed": visible,
+		className: "sl-library-toolbar-action",
+		style: visible ? {
+			background: ui.tokens.surface4,
+			color: ui.tokens.textPrimary
+		} : void 0
+	}, "Search");
+}
+//#endregion
 //#region src/saved-searches.ts
+const RATING_OP_SYMBOL = {
+	lt: "<",
+	lte: "≤",
+	gt: ">",
+	gte: "≥",
+	eq: "=",
+	neq: "≠"
+};
+/** Short human summary of a filter, e.g. "≥3★ · red · edited"; "" while it
+*  narrows nothing. */
+function filterSummary(f) {
+	const parts = [];
+	if (f.rating > 0 || f.ratingOp !== "gte") parts.push(`${RATING_OP_SYMBOL[f.ratingOp] ?? "≥"}${f.rating}★`);
+	if (f.flag !== "any") parts.push(f.flag);
+	if (f.label !== "any") parts.push(f.label);
+	if (f.keywords.length) parts.push(f.keywords.join(", "));
+	if (f.edited && f.edited !== "any") parts.push(f.edited);
+	return parts.join(" · ");
+}
+/** The whole Library filter a saved search puts back: one saved before the
+*  Edits filter existed sets Edits to All. */
+function restoredFilter(s) {
+	return {
+		...s.filter,
+		edited: s.filter.edited ?? "any"
+	};
+}
 /** An id no entry in `list` uses. The fallback is for a runtime without
 *  crypto.randomUUID (an insecure context). */
 function newSearchId(list) {
@@ -370,22 +475,6 @@ function load() {
 function save(list) {
 	api().settings.set(KEY, list);
 }
-function filterSummary(f) {
-	const parts = [];
-	const opSym = {
-		lt: "<",
-		lte: "≤",
-		gt: ">",
-		gte: "≥",
-		eq: "=",
-		neq: "≠"
-	};
-	if (f.rating > 0 || f.ratingOp !== "gte") parts.push(`${opSym[f.ratingOp] ?? "≥"}${f.rating}★`);
-	if (f.flag !== "any") parts.push(f.flag);
-	if (f.label !== "any") parts.push(f.label);
-	if (f.keywords.length) parts.push(f.keywords.join(", "));
-	return parts.join(" · ");
-}
 function SmartSearchesPanel() {
 	const ui = api().ui;
 	if (!ui) return h("div", { style: {
@@ -403,6 +492,9 @@ function SmartSearchesPanel() {
 		});
 	}, []);
 	const liveQuery = searchStore()((s) => s.query);
+	const searching = searchStore()((s) => s.visible);
+	const toggleSearch = searchStore()((s) => s.toggle);
+	const combo = api().keybindings.getBinding(TOGGLE_SEARCH_ACTION);
 	const liveFilter = api().stores.useUIStore((s) => s.filter);
 	const canSave = isQueryActive(liveQuery) || filterSummary(liveFilter) !== "";
 	const commit = (next) => {
@@ -419,7 +511,7 @@ function SmartSearchesPanel() {
 	};
 	const onApply = (s) => {
 		searchStore().getState().setQuery(s.query);
-		api().stores.useUIStore.getState().setFilter(s.filter);
+		api().stores.useUIStore.getState().setFilter(restoredFilter(s));
 	};
 	const onDelete = (id) => {
 		commit(withoutSavedSearch(list, id));
@@ -450,7 +542,18 @@ function SmartSearchesPanel() {
 		display: "flex",
 		alignItems: "center",
 		gap: "4px"
-	} }, h("input", {
+	} }, h(ui.Button, {
+		variant: "ghost",
+		size: "sm",
+		onClick: toggleSearch,
+		title: withShortcut(searching ? "Close the library search" : "Search the library", combo),
+		"aria-label": "Toggle library search",
+		"aria-pressed": searching,
+		style: searching ? {
+			color: t.accent,
+			padding: "4px"
+		} : { padding: "4px" }
+	}, searchIcon(13)), h("input", {
 		type: "text",
 		value: name,
 		placeholder: "Name this search…",
@@ -464,12 +567,12 @@ function SmartSearchesPanel() {
 		size: "sm",
 		onClick: onSave,
 		disabled: !canSave,
-		title: canSave ? "Save the current search + filters" : "Type a search or set a filter first"
+		title: canSave ? "Save the current search + filters" : withShortcut("Search the library", combo) + " or set a filter first"
 	}, "Save")), list.length === 0 ? h("p", { style: {
 		padding: "8px 4px",
 		fontSize: "10px",
 		color: t.textMuted
-	} }, "No saved searches yet. Search or filter the Library, then Save.") : h("ul", { style: {
+	} }, `No saved searches yet. ${combo ? `Search (${combo})` : "Search"} or filter the Library, then Save.`) : h("ul", { style: {
 		display: "flex",
 		flexDirection: "column",
 		gap: "2px",
@@ -544,7 +647,6 @@ function SmartSearchesPanel() {
 }
 //#endregion
 //#region src/index.ts
-const ID = "com.safelight.advanced-library-sort";
 const GRID_FILTER_ID = `${ID}.filter`;
 const DEBOUNCE_MS = 150;
 function activate(api) {
@@ -552,10 +654,12 @@ function activate(api) {
 	const store = initSearchStore(api);
 	for (const sort of SORTS) api.registerLibrarySort(sort);
 	const applyFilter = () => {
-		const matcher = buildMatcher(store.getState().query);
+		const { query } = store.getState();
 		api.registerGridFilter({
 			id: GRID_FILTER_ID,
-			test: matcher,
+			test: buildMatcher(query, api.catalog.editedAt),
+			reads: isQueryActive(query) ? void 0 : [],
+			readsEdits: queryReadsEdits(query),
 			onClear: () => store.getState().setQuery("")
 		});
 	};
@@ -572,17 +676,17 @@ function activate(api) {
 		component: SearchBar,
 		order: 0
 	});
+	api.registerSlot({
+		id: `${ID}.toggle`,
+		slot: "library-toolbar",
+		component: SearchToggle
+	});
 	api.registerKeybinding({
-		id: `${ID}.focus`,
+		id: TOGGLE_SEARCH_ACTION,
 		label: "Toggle library search",
 		category: "Library",
 		defaultCombo: "Ctrl+F",
-		handler: () => {
-			const s = store.getState();
-			const next = !s.visible;
-			s.setVisible(next);
-			if (!next) s.setQuery("");
-		}
+		handler: () => store.getState().toggle()
 	});
 	api.registerPanel({
 		id: `${ID}.smart`,

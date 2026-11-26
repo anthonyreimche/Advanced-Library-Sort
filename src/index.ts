@@ -13,9 +13,10 @@ import { initSearchStore } from "./search-store";
 import { buildMatcher, isQueryActive, queryReadsEdits } from "./query";
 import { SORTS } from "./sort";
 import { SearchBar } from "./SearchBar";
+import { SearchToggle } from "./SearchToggle";
+import { ID, TOGGLE_SEARCH_ACTION } from "./shortcut";
 import { SmartSearchesPanel } from "./SmartSearches";
 
-const ID = "com.safelight.advanced-library-sort";
 const GRID_FILTER_ID = `${ID}.filter`;
 const DEBOUNCE_MS = 150;
 
@@ -62,19 +63,22 @@ export function activate(api: SafelightAPI): void {
     order: 0,
   });
 
-  // Ctrl+F toggles the search bar (rebindable in Preferences ▸ Shortcuts).
-  // Opening focuses it (SearchBar effect); closing clears the query.
+  // The toolbar's Search button, beside the other Library actions.
+  api.registerSlot({
+    id: `${ID}.toggle`,
+    slot: "library-toolbar",
+    component: SearchToggle,
+  });
+
+  // Ctrl+F (Cmd+F on a Mac) toggles the search bar, rebindable in
+  // Preferences ▸ Shortcuts. Opening focuses it (SearchBar effect); closing
+  // clears the query.
   api.registerKeybinding({
-    id: `${ID}.focus`,
+    id: TOGGLE_SEARCH_ACTION,
     label: "Toggle library search",
     category: "Library",
     defaultCombo: "Ctrl+F",
-    handler: () => {
-      const s = store.getState();
-      const next = !s.visible;
-      s.setVisible(next);
-      if (!next) s.setQuery("");
-    },
+    handler: () => store.getState().toggle(),
   });
 
   // Saved searches panel, docked on the left of the Library.

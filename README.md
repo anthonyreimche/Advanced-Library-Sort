@@ -18,7 +18,8 @@ piece of info sort to the end, so your tagged shots always come first.
 
 ## Search as you type
 
-Press **Ctrl+F** to open the search bar (rebindable under
+Click **Search** in the Library toolbar, or the magnifier in the Smart Searches
+panel, or press **Ctrl+F** (**Cmd+F** on a Mac; rebindable under
 *Preferences ▸ Shortcuts*). Start typing and the grid filters instantly.
 
 Type plain words to match across filename, keywords, camera, lens, and capture
@@ -51,6 +52,7 @@ the Library's own sort menu.
 The **Smart Searches** panel (docked on the left of the Library) keeps your
 favourite query and filter combos one click away — *Keepers from this trip*,
 *Telephoto wildlife*, *Anything over ISO 6400* — whatever you reach for often.
+Click its magnifier to open the search, type, then name it and press **Save**.
 
 ## Privacy
 

@@ -7,21 +7,29 @@ import type { SafelightAPI, StoreApi } from "./safelight";
 export interface SearchState {
   query: string;
   setQuery(q: string): void;
-  /** Whether the search bar is shown. Toggled by Ctrl+F / the close button. */
+  /** Whether the search bar is shown. */
   visible: boolean;
   setVisible(v: boolean): void;
+  /** Opens the bar, or closes it and clears the query: the shortcut and both toggles. */
+  toggle(): void;
+}
+
+/** The bar after a toggle: opening keeps the box, closing empties it. */
+export function toggled(s: { visible: boolean; query: string }): { visible: boolean; query: string } {
+  return s.visible ? { visible: false, query: "" } : { visible: true, query: s.query };
 }
 
 let store: StoreApi<SearchState> | null = null;
 
 export function initSearchStore(api: SafelightAPI): StoreApi<SearchState> {
   store = api.stores.create<SearchState>((set) => ({
-    // Hidden until invoked with Ctrl+F (Lightroom-style), so it never steals
-    // focus on startup or occupies space when unused.
+    // Hidden until invoked (Lightroom-style), so it never steals focus on
+    // startup or occupies space when unused.
     query: "",
     setQuery: (q) => set({ query: q }),
     visible: false,
     setVisible: (v) => set({ visible: v }),
+    toggle: () => set(toggled),
   }));
   return store;
 }

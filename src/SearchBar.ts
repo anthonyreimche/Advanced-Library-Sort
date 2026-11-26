@@ -1,6 +1,7 @@
 // The Library search bar. Mounted into the "library-subbar" slot, it renders
 // its own full-width bar directly below the toolbar — or nothing when hidden.
-// Toggled with Ctrl+F (handler in index.ts) or the close button. Filtering is
+// Toggled with Ctrl+F (handler in index.ts), the toolbar's Search button, the
+// Smart Searches magnifier, or the close button. Filtering is
 // wired centrally in index.ts (debounced); this component is pure UI.
 //
 // Layout uses inline styles (not Tailwind classes): extensions load at runtime,
@@ -11,6 +12,7 @@ import { h, R, api } from "./runtime";
 import { searchStore } from "./search-store";
 import { isQueryActive } from "./query";
 import { searchIcon } from "./icons";
+import { TOGGLE_SEARCH_ACTION, withShortcut } from "./shortcut";
 
 export function SearchBar() {
   const ui = api().ui;
@@ -143,7 +145,7 @@ export function SearchBar() {
       variant: "ghost",
       size: "sm",
       onClick: close,
-      title: "Close search (Ctrl+F)",
+      title: withShortcut("Close search", api().keybindings.getBinding(TOGGLE_SEARCH_ACTION)),
       "aria-label": "Close search",
     },
     "×",

@@ -8,6 +8,7 @@ import { h, R, api } from "./runtime";
 import { searchStore } from "./search-store";
 import { isQueryActive } from "./query";
 import { searchIcon } from "./icons";
+import { TOGGLE_SEARCH_ACTION, withShortcut } from "./shortcut";
 import {
   filterSummary,
   restoredFilter,
@@ -49,6 +50,9 @@ export function SmartSearchesPanel() {
   }, []);
 
   const liveQuery: string = searchStore()((s) => s.query);
+  const searching: boolean = searchStore()((s) => s.visible);
+  const toggleSearch: () => void = searchStore()((s) => s.toggle);
+  const combo = api().keybindings.getBinding(TOGGLE_SEARCH_ACTION);
   const liveFilter: LibraryFilter = api().stores.useUIStore((s) => s.filter);
   const canSave = isQueryActive(liveQuery) || filterSummary(liveFilter) !== "";
 
@@ -104,6 +108,21 @@ export function SmartSearchesPanel() {
     h(
       "div",
       { style: { display: "flex", alignItems: "center", gap: "4px" } },
+      // Opens the Library's search bar: what it finds is what Save stores.
+      h(
+        ui.Button,
+        {
+          variant: "ghost",
+          size: "sm",
+          onClick: toggleSearch,
+          title: withShortcut(searching ? "Close the library search" : "Search the library", combo),
+          "aria-label": "Toggle library search",
+          "aria-pressed": searching,
+          // Lit while the bar is open; otherwise the ghost look, hover included.
+          style: searching ? { color: t.accent, padding: "4px" } : { padding: "4px" },
+        },
+        searchIcon(13),
+      ),
       h("input", {
         type: "text",
         value: name,
@@ -124,7 +143,7 @@ export function SmartSearchesPanel() {
           disabled: !canSave,
           title: canSave
             ? "Save the current search + filters"
-            : "Type a search or set a filter first",
+            : withShortcut("Search the library", combo) + " or set a filter first",
         },
         "Save",
       ),
@@ -139,7 +158,7 @@ export function SmartSearchesPanel() {
               color: t.textMuted,
             },
           },
-          "No saved searches yet. Search or filter the Library, then Save.",
+          `No saved searches yet. ${combo ? `Search (${combo})` : "Search"} or filter the Library, then Save.`,
         )
       : h(
           "ul",
